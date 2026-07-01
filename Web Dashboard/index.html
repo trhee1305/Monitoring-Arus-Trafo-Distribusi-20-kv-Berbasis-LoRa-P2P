@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MONITRAFO-20KV - Control Center</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        :root {
+            --primary-navy: #282562;
+            --accent-orange: #ec6923;
+            --pure-white: #ffffff;
+            --text-dark: #1e293b;
+        }
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            /* Mengubah latar belakang utama menjadi putih polos */
+            background-color: var(--pure-white); 
+            color: var(--text-dark); 
+            min-height: 100vh; 
+            margin: 0;
+        }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        
+        /* Panel kotak menggunakan warna terang berbasis abu-abu sangat muda */
+        .glass-panel { 
+            background: rgba(241, 245, 249, 0.9); 
+            backdrop-filter: blur(12px); 
+            border: 1px solid rgba(40, 37, 98, 0.1); 
+        }
+        
+        /* Scrollbar styling untuk tema terang */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* Sidebar Styling menggunakan Navy Tua Elegan */
+        .sidebar-item { transition: all 0.3s ease; color: #cbd5e1; }
+        .sidebar-item:hover { background: rgba(255, 255, 255, 0.1); color: white; }
+        
+        /* Menu aktif menggunakan aksen warna Oranye #ec6923 */
+        .active-menu { 
+            background: var(--accent-orange) !important; 
+            color: white !important; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 14px 0 rgba(236, 105, 35, 0.4); 
+        }
+    </style>
+</head>
+<body class="flex overflow-hidden">
+
+    <div id="login-screen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-100/90 backdrop-blur-sm">
+        <div class="glass-panel w-full max-w-md rounded-3xl p-8 border border-slate-200 shadow-2xl shadow-slate-300">
+            <h2 style="color: var(--primary-navy);" class="text-2xl font-extrabold text-center mb-6">MONITRAFO-20KV</h2>
+            <form id="login-form" class="space-y-4">
+                <input type="text" id="username" placeholder="Username" class="w-full bg-white border border-slate-300 rounded-xl p-3 text-slate-900 focus:outline-none focus:border-[#ec6923]">
+                <input type="password" id="password" placeholder="Password" class="w-full bg-white border border-slate-300 rounded-xl p-3 text-slate-900 focus:outline-none focus:border-[#ec6923]">
+                <button type="submit" style="background-color: var(--accent-orange);" class="w-full text-white py-3 rounded-xl font-bold transition hover:opacity-90 shadow-md">MASUK</button>
+            </form>
+        </div>
+    </div>
+
+    <aside id="sidebar-nav" class="hidden w-64 flex-col h-screen relative z-10 rounded-none border-r border-slate-200" style="background-color: var(--primary-navy);">
+        <div class="p-6 mb-4">
+            <h1 class="text-2xl font-extrabold tracking-tight text-white">MONITRAFO<span style="color: var(--accent-orange);">.</span></h1>
+            <p class="text-[10px] text-slate-300 uppercase tracking-widest mt-1">Sistem Distribusi 20kV</p>
+        </div>
+        <nav class="flex-1 px-4 space-y-2">
+            <div id="nav-dashboard" onclick="switchView('dashboard')" class="sidebar-item active-menu p-3 font-semibold cursor-pointer flex items-center text-sm">
+                <i class="fa-solid fa-house w-6 text-center mr-2"></i> Dashboard
+            </div>
+            <div id="nav-log" onclick="switchView('log')" class="sidebar-item p-3 font-semibold cursor-pointer flex items-center rounded-xl text-sm">
+                <i class="fa-solid fa-folder w-6 text-center mr-2"></i> Log Pengiriman Data
+            </div>
+            <div id="nav-grafik" onclick="switchView('grafik')" class="sidebar-item p-3 font-semibold cursor-pointer flex items-center rounded-xl text-sm">
+                <i class="fa-solid fa-chart-pie w-6 text-center mr-2"></i> Grafik Monitoring
+            </div>
+        </nav>
+        <div class="p-4 border-t border-white/10">
+            <div onclick="handleLogout()" class="sidebar-item p-3 font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 cursor-pointer flex items-center rounded-xl text-sm transition">
+                <i class="fa-solid fa-right-from-bracket w-6 text-center mr-2"></i> Logout
+            </div>
+        </div>
+    </aside>
+
+    <main id="main-content" class="hidden flex-1 h-screen overflow-y-auto p-6 lg:p-8 relative z-0">
+        <div class="max-w-7xl mx-auto">
+            
+            <header class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 id="page-title" style="color: var(--primary-navy);" class="text-xl font-bold">Control Center</h2>
+                    <p class="text-slate-500 text-xs">Monitoring Realtime LoRaWAN</p>
+                </div>
+                <div class="glass-panel px-4 py-2 rounded-xl flex items-center text-sm border border-slate-200 shadow-sm bg-slate-50">
+                    <span class="relative flex h-3 w-3 mr-3">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                    </span>
+                    <span class="text-slate-700 font-medium text-xs">Koneksi Aktif</span>
+                </div>
+            </header>
+
+            <div id="alert-box" class="hidden bg-red-50 border-l-8 border-red-600 p-5 rounded-r-xl shadow-md transition-all duration-500 mb-6">
+                <div class="flex items-start sm:items-center">
+                    <i class="fa-solid fa-triangle-exclamation text-3xl text-red-600 mr-4"></i>
+                    <div>
+                        <h3 class="font-extrabold text-red-800 text-sm tracking-wide uppercase">PERINGATAN: KONDISI TRAFO TIDAK AMAN!</h3>
+                        <p id="alert-message" class="text-red-700 text-xs mt-1 font-semibold leading-relaxed">...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-dashboard" class="space-y-6 block transition-opacity duration-300">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div id="card-aman" class="glass-panel p-5 rounded-2xl border-t-4 border-emerald-500 transition-all duration-300 opacity-40 scale-95 shadow-sm bg-white">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Status Kesehatan</p>
+                                <h3 class="font-black text-emerald-600 text-lg mt-1">SANGAT AMAN</h3>
+                            </div>
+                            <i class="fa-solid fa-shield-check text-emerald-500 text-2xl opacity-50"></i>
+                        </div>
+                    </div>
+                    <div id="card-sedang" class="glass-panel p-5 rounded-2xl border-t-4 border-yellow-500 transition-all duration-300 opacity-40 scale-95 shadow-sm bg-white">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Status Kesehatan</p>
+                                <h3 class="font-black text-yellow-600 text-lg mt-1">SEDANG</h3>
+                            </div>
+                            <i class="fa-solid fa-circle-exclamation text-yellow-500 text-2xl opacity-50"></i>
+                        </div>
+                    </div>
+                    <div id="card-bahaya" class="glass-panel p-5 rounded-2xl border-t-4 border-red-500 transition-all duration-300 opacity-40 scale-95 shadow-sm bg-white">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Status Kesehatan</p>
+                                <h3 class="font-black text-red-600 text-lg mt-1">TIDAK AMAN</h3>
+                            </div>
+                            <i class="fa-solid fa-triangle-exclamation text-red-500 text-2xl opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-4">
+                        <div class="glass-panel p-6 rounded-2xl flex justify-between items-center bg-white shadow-sm border-l-4 border-l-red-500"><p class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Arus R</p><div class="text-3xl font-black mono text-[#ef4444]" id="current-r">0.000 A</div></div>
+                        <div class="glass-panel p-6 rounded-2xl flex justify-between items-center bg-white shadow-sm border-l-4 border-l-amber-500"><p class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Arus S</p><div class="text-3xl font-black mono text-[#f59e0b]" id="current-s">0.000 A</div></div>
+                        <div class="glass-panel p-6 rounded-2xl flex justify-between items-center bg-white shadow-sm border-l-4 border-l-blue-500"><p class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Arus T</p><div class="text-3xl font-black mono text-[#3b82f6]" id="current-t">0.000 A</div></div>
+                    </div>
+                    <div class="space-y-4">
+                        <div class="glass-panel p-6 rounded-2xl flex justify-between items-center bg-white shadow-sm border-l-4 border-l-[#ec6923]"><p class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Teg. R</p><div class="text-3xl font-black mono text-[#ec6923]" id="teg-r">0.0 V</div></div>
+                        <div class="glass-panel p-6 rounded-2xl flex justify-between items-center bg-white shadow-sm border-l-4 border-l-[#ec6923]"><p class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Teg. S</p><div class="text-3xl font-black mono text-[#ec6923]" id="teg-s">0.0 V</div></div>
+                        <div class="glass-panel p-6 rounded-2xl flex justify-between items-center bg-white shadow-sm border-l-4 border-l-[#ec6923]"><p class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Teg. T</p><div class="text-3xl font-black mono text-[#ec6923]" id="teg-t">0.0 V</div></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="glass-panel p-6 rounded-2xl relative overflow-hidden bg-white shadow-sm">
+                        <div class="absolute -bottom-6 right-4 text-[100px] font-black text-slate-100 select-none z-0">915MHz</div>
+                        <div class="relative z-10">
+                            <div class="flex justify-between items-center mb-6">
+                                <h3 class="font-bold text-sm uppercase tracking-wider text-[#282562]">Tautan Nirkabel LoRa</h3>
+                                <span id="signal-badge" class="px-3 py-1 rounded-full text-[10px] font-bold border border-slate-300 bg-slate-100 text-slate-700 uppercase tracking-wide">MENUNGGU</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-6">
+                                <div>
+                                    <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Sinyal (RSSI)</p>
+                                    <div class="text-3xl font-black mono mt-2 text-slate-800"><span id="rssi-detail">-0</span> <span class="text-sm text-slate-400 font-normal">dBm</span></div>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Estimasi Jarak</p>
+                                    <div class="text-3xl font-black mono mt-2 text-[#ec6923]"><span id="jarak-detail">0.0</span> <span class="text-sm text-slate-400 font-normal">m</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel p-6 rounded-2xl bg-white shadow-sm">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="font-bold text-sm uppercase tracking-wider text-[#ec6923]">Parameter Kesehatan</h3>
+                        </div>
+                        <div class="grid grid-cols-2 gap-6">
+                            <div>
+                                <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Loading</p>
+                                <div class="text-3xl font-black mono mt-2 text-slate-800"><span id="loading-detail">0.0</span> <span class="text-sm text-slate-400 font-normal">%</span></div>
+                            </div>
+                            <div>
+                                <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Unbalance</p>
+                                <div class="text-3xl font-black mono mt-2 text-[#ec6923]"><span id="unbalance-detail">0.0</span> <span class="text-sm text-slate-400 font-normal">%</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-grafik" class="hidden space-y-6">
+                <div class="glass-panel p-6 rounded-2xl h-[calc(100vh-180px)] flex flex-col bg-white shadow-sm">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-sm uppercase tracking-wider text-[#282562]"><i class="fa-solid fa-chart-line mr-2 text-[#ec6923]"></i> Grafik Realtime Arus & Tegangan</h3>
+                        <span class="text-xs text-slate-400 mono">Update Otomatis</span>
+                    </div>
+                    <div class="w-full flex-1 relative">
+                        <canvas id="monitoringChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-log" class="hidden space-y-6">
+                <div class="glass-panel rounded-2xl overflow-hidden h-[calc(100vh-180px)] flex flex-col bg-white shadow-sm">
+                    <div class="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center shrink-0">
+                        <h3 class="font-bold text-sm uppercase tracking-wider text-[#282562]"><i class="fa-solid fa-list mr-2"></i> Log Pengiriman Data</h3>
+                        <div class="text-[10px] text-slate-500 mono">Update: <span id="last-update">-</span></div>
+                    </div>
+                    <div class="overflow-x-auto flex-1">
+                        <table class="w-full text-left border-collapse whitespace-nowrap">
+                            <thead class="sticky top-0 bg-slate-100 text-slate-600 text-[11px] uppercase z-10 shadow-sm border-b border-slate-200">
+                                <tr>
+                                    <th class="p-4 border-b border-slate-200">Waktu (Timestamp)</th>
+                                    <th class="p-4 border-b border-slate-200">Arus R/S/T (A)</th>
+                                    <th class="p-4 border-b border-slate-200">Tegangan R/S/T (V)</th>
+                                    <th class="p-4 border-b border-slate-200">RSSI (dBm)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="log-table-body" class="text-sm mono divide-y divide-slate-100 text-slate-700">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+        const SUPABASE_URL = 'https://ososnpeixtxejskfpceh.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zb3NucGVpeHR4ZWpza2ZwY2VoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzMjQ3MTYsImV4cCI6MjA5NjkwMDcxNn0.N4MTTTAvqBwYSnNKuSUk0Dt6jzMjgMHzEQ_Okq2BN6c'; 
+        const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        const I_NOMINAL = 50.0; 
+
+        // --- SPA NAVIGATION ---
+        window.switchView = (viewId) => {
+            ['dashboard', 'grafik', 'log'].forEach(id => {
+                document.getElementById(`view-${id}`).classList.add('hidden');
+                document.getElementById(`view-${id}`).classList.remove('block');
+                
+                const nav = document.getElementById(`nav-${id}`);
+                nav.classList.remove('active-menu', 'text-white');
+                nav.classList.add('text-slate-400');
+            });
+
+            document.getElementById(`view-${viewId}`).classList.remove('hidden');
+            document.getElementById(`view-${viewId}`).classList.add('block');
+            
+            const activeNav = document.getElementById(`nav-${viewId}`);
+            activeNav.classList.add('active-menu', 'text-white');
+            activeNav.classList.remove('text-slate-400');
+
+            const titleMap = {
+                'dashboard': 'Control Center',
+                'grafik': 'Grafik Realtime',
+                'log': 'Riwayat Data Sensor'
+            };
+            document.getElementById('page-title').innerText = titleMap[viewId];
+
+            if (viewId === 'grafik' && realtimeChart) {
+                realtimeChart.resize();
+            }
+        };
+
+        // --- INITIALIZE CHART.JS (Menyesuaikan Grid Tema Terang) ---
+        const ctx = document.getElementById('monitoringChart').getContext('2d');
+        const realtimeChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [], 
+                datasets: [
+                    { label: 'Arus R', borderColor: '#ef4444', backgroundColor: '#ef4444', data: [], tension: 0.4, yAxisID: 'y' },
+                    { label: 'Arus S', borderColor: '#f59e0b', backgroundColor: '#f59e0b', data: [], tension: 0.4, yAxisID: 'y' },
+                    { label: 'Arus T', borderColor: '#3b82f6', backgroundColor: '#3b82f6', data: [], tension: 0.4, yAxisID: 'y' },
+                    { label: 'Tegangan R', borderColor: '#fca5a5', borderDash: [5, 5], data: [], tension: 0.4, yAxisID: 'y1', hidden: true },
+                    { label: 'Tegangan S', borderColor: '#fcd34d', borderDash: [5, 5], data: [], tension: 0.4, yAxisID: 'y1', hidden: true },
+                    { label: 'Tegangan T', borderColor: '#93c5fd', borderDash: [5, 5], data: [], tension: 0.4, yAxisID: 'y1', hidden: true }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { labels: { color: '#1e293b' } } },
+                scales: {
+                    x: { ticks: { color: '#64748b' }, grid: { color: '#f1f5f9' } },
+                    y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Arus (A)', color: '#1e293b' }, ticks: { color: '#64748b' }, grid: { color: '#f1f5f9' } },
+                    y1: { type: 'linear', display: true, position: 'right', title: { display: true, text: 'Tegangan (V)', color: '#1e293b' }, grid: { drawOnChartArea: false }, ticks: { color: '#64748b' } }
+                }
+            }
+        });
+
+        function formatTime(isoString) {
+            if (!isoString) return "-";
+            const date = new Date(isoString);
+            return date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+
+        function updateChartData(d) {
+            const timeStr = formatTime(d.created_at);
+            if (realtimeChart.data.labels.length > 20) {
+                realtimeChart.data.labels.shift();
+                realtimeChart.data.datasets.forEach(dataset => dataset.data.shift());
+            }
+            realtimeChart.data.labels.push(timeStr);
+            realtimeChart.data.datasets[0].data.push(d.arus_r);
+            realtimeChart.data.datasets[1].data.push(d.arus_s);
+            realtimeChart.data.datasets[2].data.push(d.arus_t);
+            realtimeChart.data.datasets[3].data.push(d.teg_r);
+            realtimeChart.data.datasets[4].data.push(d.teg_s);
+            realtimeChart.data.datasets[5].data.push(d.teg_t);
+            realtimeChart.update();
+        }
+
+        // --- ALERT STATUS KARDUS ---
+        function showAlert(loadingPerc, unbalancePerc) {
+            const alertBox = document.getElementById('alert-box');
+            const alertMessage = document.getElementById('alert-message');
+            
+            const cAman = document.getElementById('card-aman');
+            const cSedang = document.getElementById('card-sedang');
+            const cBahaya = document.getElementById('card-bahaya');
+
+            [cAman, cSedang, cBahaya].forEach(c => { c.classList.remove('opacity-100', 'scale-100', 'shadow-lg'); c.classList.add('opacity-40', 'scale-95'); });
+
+            const isOverload = loadingPerc > 100;
+            const isUnbalanceExtreme = unbalancePerc > 25;
+
+            if (isOverload || isUnbalanceExtreme) {
+                cBahaya.classList.replace('opacity-40', 'opacity-100');
+                cBahaya.classList.replace('scale-95', 'scale-100');
+                cBahaya.classList.add('shadow-lg', 'shadow-red-500/20');
+                
+                alertBox.classList.remove('hidden');
+                if (isOverload && isUnbalanceExtreme) {
+                    alertMessage.innerText = "Kondisi kritis! Trafo mengalami overload dan ketidakseimbangan beban parah secara bersamaan.";
+                } else if (isOverload) {
+                    alertMessage.innerText = "Segera kurangi pemakaian beban pada trafo untuk mencegah pemanasan berlebih.";
+                } else {
+                    alertMessage.innerText = "Ketidakseimbangan beban antar fasa sangat tinggi. Segera atur ulang pembagian beban oleh teknisi.";
+                }
+            } else if (unbalancePerc > 15 || loadingPerc > 80) {
+                alertBox.classList.add('hidden');
+                cSedang.classList.replace('opacity-40', 'opacity-100');
+                cSedang.classList.replace('scale-95', 'scale-100');
+                cSedang.classList.add('shadow-lg', 'shadow-yellow-500/20');
+            } else {
+                alertBox.classList.add('hidden');
+                cAman.classList.replace('opacity-40', 'opacity-100');
+                cAman.classList.replace('scale-95', 'scale-100');
+                cAman.classList.add('shadow-lg', 'shadow-emerald-500/20');
+            }
+        }
+
+        function updateLoraDetails(rssi) {
+            const rssiValue = rssi || -120;
+            document.getElementById('rssi-detail').innerText = rssiValue;
+            
+            const A = -35; 
+            const n = 3.2; 
+            let distance = (rssiValue < A) ? Math.pow(10, (A - rssiValue) / (10 * n)) : 1.0;
+            document.getElementById('jarak-detail').innerText = distance.toFixed(1);
+
+            const badge = document.getElementById('signal-badge');
+            if (rssiValue >= -65) {
+                badge.innerText = 'SANGAT BAIK'; badge.className = 'px-3 py-1 rounded-full text-[10px] font-bold border border-green-300 bg-green-50 text-green-700 uppercase tracking-wide';
+            } else if (rssiValue >= -90) {
+                badge.innerText = 'SINYAL BAIK'; badge.className = 'px-3 py-1 rounded-full text-[10px] font-bold border border-emerald-300 bg-emerald-50 text-emerald-700 uppercase tracking-wide';
+            } else {
+                badge.innerText = 'SINYAL LEMAH'; badge.className = 'px-3 py-1 rounded-full text-[10px] font-bold border border-red-300 bg-red-50 text-red-700 uppercase tracking-wide';
+            }
+        }
+
+        window.updateDashboardMetrics = (d) => {
+            if (!d) return;
+            let arus_r = d.arus_r || 0, arus_s = d.arus_s || 0, arus_t = d.arus_t || 0;
+
+            document.getElementById('current-r').innerText = arus_r.toFixed(1) + ' A';
+            document.getElementById('current-s').innerText = arus_s.toFixed(1) + ' A';
+            document.getElementById('current-t').innerText = arus_t.toFixed(1) + ' A';
+            document.getElementById('teg-r').innerText = (d.teg_r || 0).toFixed(1) + ' V';
+            document.getElementById('teg-s').innerText = (d.teg_s || 0).toFixed(1) + ' V';
+            document.getElementById('teg-t').innerText = (d.teg_t || 0).toFixed(1) + ' V';
+            document.getElementById('last-update').innerText = new Date(d.created_at).toLocaleTimeString('id-ID');
+            
+            let i_avg = (arus_r + arus_s + arus_t) / 3.0;
+            let loadingPerc = (i_avg > 0) ? (i_avg / I_NOMINAL): 0;
+            let max_dev = Math.max(Math.abs(arus_r - i_avg), Math.abs(arus_s - i_avg), Math.abs(arus_t - i_avg));
+            let unbalancePerc = (i_avg > 0) ? (max_dev / i_avg) * 100 : 0;
+
+            document.getElementById('loading-detail').innerText = loadingPerc.toFixed(1);
+            document.getElementById('unbalance-detail').innerText = unbalancePerc.toFixed(1);
+
+            showAlert(loadingPerc, unbalancePerc);
+            updateLoraDetails(d.rssi);
+            updateChartData(d);
+        };
+
+        window.addLogEntry = (d) => {
+            if (!d) return;
+            const tbody = document.getElementById('log-table-body');
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-slate-50 transition-colors duration-200';
+            
+            const arusStr = `${(d.arus_r||0).toFixed(2)} | ${(d.arus_s||0).toFixed(2)} | ${(d.arus_t||0).toFixed(2)}`;
+            const tegStr = `${(d.teg_r||0).toFixed(0)} | ${(d.teg_s||0).toFixed(0)} | ${(d.teg_t||0).toFixed(0)}`;
+            
+            tr.innerHTML = `
+                <td class="p-4 text-slate-500">${formatTime(d.created_at)}</td>
+                <td class="p-4 text-slate-800 font-bold">${arusStr}</td>
+                <td class="p-4 text-[#ec6923] font-bold">${tegStr}</td>
+                <td class="p-4 text-slate-700 font-medium">${d.rssi || 0}</td>
+            `;
+            tbody.prepend(tr);
+            if (tbody.children.length > 50) tbody.removeChild(tbody.lastChild);
+        };
+
+        async function initDashboard() {
+            try {
+                const { data } = await supabase.from('data_trafo').select('*').order('created_at', { ascending: false }).limit(20);
+                if (data && data.length > 0) {
+                    const sortedData = [...data].reverse();
+                    sortedData.forEach(row => { updateChartData(row); addLogEntry(row); });
+                    window.updateDashboardMetrics(data[0]);
+                }
+
+                supabase.channel('realtime_trafo_channel')
+                    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'data_trafo' }, payload => {
+                        window.updateDashboardMetrics(payload.new);
+                        window.addLogEntry(payload.new);
+                    }).subscribe();
+            } catch (err) { console.error("Error Koneksi:", err); }
+        }
+
+        document.getElementById('login-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (document.getElementById('username').value === 'admin' && document.getElementById('password').value === 'admin123') {
+                localStorage.setItem('monitrafo_logged_in', 'true');
+                showDashboard();
+                initDashboard();
+            } else { alert('Kredensial salah!'); }
+        });
+
+        window.handleLogout = () => { localStorage.removeItem('monitrafo_logged_in'); location.reload(); };
+
+        function showDashboard() {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('sidebar-nav').classList.remove('hidden');
+            document.getElementById('sidebar-nav').classList.add('flex');
+            document.getElementById('main-content').classList.remove('hidden');
+            switchView('dashboard');
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('monitrafo_logged_in') === 'true') {
+                showDashboard();
+                initDashboard();
+            }
+        });
+    </script>
+</body>
+</html>
